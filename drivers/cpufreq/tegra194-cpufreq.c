@@ -20,9 +20,10 @@
 
 #define KHZ                     1000
 #define REF_CLK_MHZ             408 /* 408 MHz */
-#define US_DELAY                500
 #define CPUFREQ_TBL_STEP_HZ     (50 * KHZ * KHZ)
 #define MAX_CNT                 ~0U
+
+#define MAX_DELTA_KHZ          115200
 
 #define NDIV_MASK              0x1FF
 
@@ -61,6 +62,7 @@ struct tegra_cpufreq_soc {
 	int maxcpus_per_cluster;
 	unsigned int num_clusters;
 	phys_addr_t actmon_cntr_base;
+	u32 refclk_delta_min;
 };
 
 struct tegra194_cpufreq_data {
@@ -132,6 +134,8 @@ static void tegra234_read_counters(struct tegra_cpu_ctr *c)
 {
 	struct tegra194_cpufreq_data *data = cpufreq_get_driver_data();
 	void __iomem *actmon_reg;
+	volatile u32 delta_refcnt;
+	int cnt = 0;
 	u32 cpuid, clusterid;
 	u64 val;
 
@@ -141,10 +145,20 @@ static void tegra234_read_counters(struct tegra_cpu_ctr *c)
 	val = readq(actmon_reg);
 	c->last_refclk_cnt = upper_32_bits(val);
 	c->last_coreclk_cnt = lower_32_bits(val);
-	udelay(US_DELAY);
-	val = readq(actmon_reg);
-	c->refclk_cnt = upper_32_bits(val);
-	c->coreclk_cnt = lower_32_bits(val);
+	do {
+		val = readq(actmon_reg);
+		c->refclk_cnt = upper_32_bits(val);
+		c->coreclk_cnt = lower_32_bits(val);
+		if (c->refclk_cnt < c->last_refclk_cnt)
+			delta_refcnt = c->refclk_cnt + (MAX_CNT - c->last_refclk_cnt);
+		else
+			delta_refcnt = c->refclk_cnt - c->last_refclk_cnt;
+		if (++cnt >= 0xFFFF) {
+			pr_warn("cpufreq: problem with refclk on cpu:%d, delta_refcnt:%u, cnt:%d\n",
+				c->cpu, delta_refcnt, cnt);
+			break;
+		}
+	} while (delta_refcnt < data->soc->refclk_delta_min);
 }
 
 static struct tegra_cpufreq_ops tegra234_cpufreq_ops = {
@@ -159,6 +173,7 @@ static const struct tegra_cpufreq_soc tegra234_cpufreq_soc = {
 	.actmon_cntr_base = 0x9000,
 	.maxcpus_per_cluster = 4,
 	.num_clusters = 3,
+	.refclk_delta_min = 16000,
 };
 
 static const struct tegra_cpufreq_soc tegra239_cpufreq_soc = {
@@ -166,6 +181,7 @@ static const struct tegra_cpufreq_soc tegra239_cpufreq_soc = {
 	.actmon_cntr_base = 0x4000,
 	.maxcpus_per_cluster = 8,
 	.num_clusters = 1,
+	.refclk_delta_min = 16000,
 };
 
 static void tegra194_get_cpu_cluster_id(u32 cpu, u32 *cpuid, u32 *clusterid)
@@ -206,15 +222,28 @@ static inline u32 map_ndiv_to_freq(struct mrq_cpu_ndiv_limits_response
 
 static void tegra194_read_counters(struct tegra_cpu_ctr *c)
 {
+	struct tegra194_cpufreq_data *data = cpufreq_get_driver_data();
+	volatile u32 delta_refcnt;
+	int cnt = 0;
 	u64 val;
 
 	val = read_freq_feedback();
 	c->last_refclk_cnt = lower_32_bits(val);
 	c->last_coreclk_cnt = upper_32_bits(val);
-	udelay(US_DELAY);
-	val = read_freq_feedback();
-	c->refclk_cnt = lower_32_bits(val);
-	c->coreclk_cnt = upper_32_bits(val);
+	do {
+		val = read_freq_feedback();
+		c->refclk_cnt = lower_32_bits(val);
+		c->coreclk_cnt = upper_32_bits(val);
+		if (c->refclk_cnt < c->last_refclk_cnt)
+			delta_refcnt = c->refclk_cnt + (MAX_CNT - c->last_refclk_cnt);
+		else
+			delta_refcnt = c->refclk_cnt - c->last_refclk_cnt;
+		if (++cnt >= 0xFFFF) {
+			pr_warn("cpufreq: problem with refclk on cpu:%d, delta_refcnt:%u, cnt:%d\n",
+				c->cpu, delta_refcnt, cnt);
+			break;
+		}
+	} while (delta_refcnt < data->soc->refclk_delta_min);
 }
 
 static void tegra_read_counters(struct work_struct *work)
@@ -358,9 +387,9 @@ static unsigned int tegra194_get_speed(u32 cpu)
 		if (pos->driver_data != ndiv)
 			continue;
 
-		if (abs(pos->frequency - rate) > 115200) {
-			pr_warn("cpufreq: cpu%d,cur:%u,set:%u,set ndiv:%llu\n",
-				cpu, rate, pos->frequency, ndiv);
+		if (abs(pos->frequency - rate) > MAX_DELTA_KHZ) {
+			pr_warn("cpufreq: cpu%d,cur:%u,set:%u,delta:%d,set ndiv:%llu\n",
+				cpu, rate, pos->frequency, abs(rate - pos->frequency), ndiv);
 		} else {
 			rate = pos->frequency;
 		}
@@ -430,6 +459,7 @@ static const struct tegra_cpufreq_soc tegra194_cpufreq_soc = {
 	.ops = &tegra194_cpufreq_ops,
 	.maxcpus_per_cluster = 2,
 	.num_clusters = 4,
+	.refclk_delta_min = 16000,
 };
 
 static void tegra194_cpufreq_free_resources(void)
@@ -522,7 +552,7 @@ static int tegra194_cpufreq_probe(struct platform_device *pdev)
 
 	soc = of_device_get_match_data(&pdev->dev);
 
-	if (soc->ops && soc->maxcpus_per_cluster && soc->num_clusters) {
+	if (soc->ops && soc->maxcpus_per_cluster && soc->num_clusters && soc->refclk_delta_min) {
 		data->soc = soc;
 	} else {
 		dev_err(&pdev->dev, "soc data missing\n");
