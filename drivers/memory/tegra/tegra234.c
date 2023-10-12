@@ -414,7 +414,31 @@ static const struct tegra_mc_client tegra234_mc_clients[] = {
 				.security = 0x36c,
 			},
 		},
+ 	}, {
+		.id = TEGRA234_MEMORY_CLIENT_RCER,
+		.name = "rcer",
+		.bpmp_id = TEGRA_ICC_BPMP_RCE,
+		.type = TEGRA_ICC_NISO,
+		.sid = TEGRA234_SID_RCE,
+		.regs = {
+			.sid = {
+				.override = 0x690,
+				.security = 0x694,
+			},
+		},
 	}, {
+		.id = TEGRA234_MEMORY_CLIENT_RCEW,
+		.name = "rcew",
+		.bpmp_id = TEGRA_ICC_BPMP_RCE,
+		.type = TEGRA_ICC_NISO,
+		.sid = TEGRA234_SID_RCE,
+		.regs = {
+			.sid = {
+				.override = 0x698,
+				.security = 0x69c,
+			},
+		},
+ 	}, {
 		.id = TEGRA234_MEMORY_CLIENT_DLA1RDB1,
 		.name = "dla1rdb1",
 		.bpmp_id = TEGRA_ICC_BPMP_DLA_1,
@@ -523,6 +547,18 @@ static const struct tegra_mc_client tegra234_mc_clients[] = {
 			},
 		},
 	}, {
+		.id = TEGRA234_MEMORY_CLIENT_VIW,
+		.name = "viw",
+		.bpmp_id = TEGRA_ICC_BPMP_VI,
+		.type = TEGRA_ICC_ISO_VI,
+		.sid = TEGRA234_SID_ISO_VI,
+		.regs = {
+			.sid = {
+				.override = 0x390,
+				.security = 0x394,
+			},
+		},
+ 	}, {
 		.id = TEGRA234_MEMORY_CLIENT_VI2FALW,
 		.name = "vi2falw",
 		.bpmp_id = TEGRA_ICC_BPMP_VI2FAL,
@@ -571,6 +607,30 @@ static const struct tegra_mc_client tegra234_mc_clients[] = {
 			},
 		},
 	}, {
+		.id = TEGRA234_MEMORY_CLIENT_VIFALR,
+		.name = "vifalr",
+		.bpmp_id = TEGRA_ICC_BPMP_VIFAL,
+		.type = TEGRA_ICC_ISO_VIFAL,
+		.sid = TEGRA234_SID_ISO_VIFALC,
+		.regs = {
+			.sid = {
+				.override = 0x5e0,
+				.security = 0x5e4,
+			},
+		},
+	}, {
+		.id = TEGRA234_MEMORY_CLIENT_VIFALW,
+		.name = "vifalw",
+		.bpmp_id = TEGRA_ICC_BPMP_VIFAL,
+		.type = TEGRA_ICC_ISO_VIFAL,
+		.sid = TEGRA234_SID_ISO_VIFALC,
+		.regs = {
+			.sid = {
+				.override = 0x5e8,
+				.security = 0x5ec,
+			},
+		},
+ 	}, {
 		.id = TEGRA234_MEMORY_CLIENT_BPMPR,
 		.name = "bpmpr",
 		.sid = TEGRA234_SID_BPMP,
