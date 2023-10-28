@@ -207,6 +207,7 @@ int iommu_device_register(struct iommu_device *iommu,
 			  const struct iommu_ops *ops, struct device *hwdev)
 {
 	int err = 0;
+	int i = 0;
 
 	/* We need to be able to take module references appropriately */
 	if (WARN_ON(is_module_address((unsigned long)ops) && !ops->owner))
@@ -227,7 +228,7 @@ int iommu_device_register(struct iommu_device *iommu,
 	list_add_tail(&iommu->list, &iommu_device_list);
 	spin_unlock(&iommu_device_lock);
 
-	for (int i = 0; i < ARRAY_SIZE(iommu_buses) && !err; i++) {
+	for (i = 0; i < ARRAY_SIZE(iommu_buses) && !err; i++) {
 		iommu_buses[i]->iommu_ops = ops;
 		err = bus_iommu_probe(iommu_buses[i]);
 	}
@@ -239,7 +240,8 @@ EXPORT_SYMBOL_GPL(iommu_device_register);
 
 void iommu_device_unregister(struct iommu_device *iommu)
 {
-	for (int i = 0; i < ARRAY_SIZE(iommu_buses); i++)
+	int i = 0;
+	for (i = 0; i < ARRAY_SIZE(iommu_buses); i++)
 		bus_for_each_dev(iommu_buses[i], NULL, iommu, remove_iommu_group);
 
 	spin_lock(&iommu_device_lock);
