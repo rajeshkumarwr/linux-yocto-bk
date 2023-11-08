@@ -322,7 +322,6 @@
 #define EP_STATE_ENABLED	1
 
 static const unsigned int pcie_gen_freq[] = {
-	GEN1_CORE_CLK_FREQ,	/* PCI_EXP_LNKSTA_CLS == 0; undefined */
 	GEN1_CORE_CLK_FREQ,
 	GEN2_CORE_CLK_FREQ,
 	GEN3_CORE_CLK_FREQ,
@@ -874,8 +873,6 @@ static irqreturn_t tegra_pcie_ep_irq_thread(int irq, void *arg)
 
 	if (atomic_dec_and_test(&pcie->ep_link_up)) {
 		tegra_pcie_icc_set(pcie, &speed);
-		if (speed >= ARRAY_SIZE(pcie_gen_freq))
-			speed = 0;
 		if ((speed > 0) && (speed <= 4) && !pcie->is_safety_platform)
 			clk_set_rate(pcie->core_clk, pcie_gen_freq[speed - 1]);
 	}
@@ -1538,10 +1535,6 @@ retry_link:
 	}
 
 	tegra_pcie_icc_set(pcie, &speed);
-
-	if (speed >= ARRAY_SIZE(pcie_gen_freq))
-		speed = 0;
-
 	if (!pcie->core_clk_m)
 		clk_set_rate(pcie->core_clk, pcie_gen_freq[speed - 1]);
 
